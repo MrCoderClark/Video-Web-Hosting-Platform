@@ -2,10 +2,13 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from supabase import create_client
 
 from auth import get_current_user
+from config import settings
 from database import get_pool
 from models.video import UploadResponse, VideoListResponse, VideoResponse, VideoStatus
 from services.storage import (
@@ -13,6 +16,13 @@ from services.storage import (
     upload_to_storage,
     validate_file,
 )
+
+BUCKET_NAME = "videos"
+
+
+class VideoUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -202,3 +212,101 @@ async def get_video(video_id: str, current_user: dict = Depends(get_current_user
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+@router.patch("/{video_id}", response_model=VideoResponse)
+async def update_video(
+    video_id: str,
+    body: VideoUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update video title and/or description."""
+    pool = await get_pool()
+
+    sets = []
+    values: list = [uuid.UUID(video_id), uuid.UUID(current_user["id"])]
+    idx = 3
+
+    if body.title is not None:
+        sets.append(f"title = ${idx}")
+        values.append(body.title)
+        idx += 1
+    if body.description is not None:
+        sets.append(f"description = ${idx}")
+        values.append(body.description)
+        idx += 1
+
+    if not sets:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    row = await pool.fetchrow(
+        f"""
+        UPDATE videohost.videos
+        SET {', '.join(sets)}
+        WHERE id = $1 AND user_id = $2
+        RETURNING id, user_id, title, description, status, original_filename,
+                  original_size_bytes, storage_path, thumbnail_url, duration_seconds,
+                  width, height, created_at, updated_at
+        """,
+        *values,
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    return VideoResponse(
+        id=str(row["id"]),
+        user_id=str(row["user_id"]),
+        title=row["title"],
+        description=row["description"],
+        status=row["status"],
+        original_filename=row["original_filename"],
+        original_size_bytes=row["original_size_bytes"],
+        storage_path=row["storage_path"],
+        thumbnail_url=row["thumbnail_url"],
+        duration_seconds=float(row["duration_seconds"]) if row["duration_seconds"] else None,
+        width=row["width"],
+        height=row["height"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+@router.delete("/{video_id}", status_code=204)
+async def delete_video(video_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a video: removes DB row and all storage files."""
+    pool = await get_pool()
+
+    row = await pool.fetchrow(
+        "DELETE FROM videohost.videos WHERE id = $1 AND user_id = $2 RETURNING storage_path",
+        uuid.UUID(video_id),
+        uuid.UUID(current_user["id"]),
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Clean up storage files (best-effort)
+    try:
+        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        bucket = client.storage.from_(BUCKET_NAME)
+        user_id = current_user["id"]
+        prefix = f"{user_id}/{video_id}"
+        files = bucket.list(prefix)
+        if files:
+            paths = [f"{prefix}/{f['name']}" for f in files]
+            # Also list nested dirs (hls/360p, hls/720p, etc.)
+            for f in files:
+                if f.get("id") is None:  # directory
+                    sub_files = bucket.list(f"{prefix}/{f['name']}")
+                    if sub_files:
+                        for sf in sub_files:
+                            if sf.get("id") is None:
+                                deep = bucket.list(f"{prefix}/{f['name']}/{sf['name']}")
+                                if deep:
+                                    paths.extend([f"{prefix}/{f['name']}/{sf['name']}/{d['name']}" for d in deep])
+                            else:
+                                paths.append(f"{prefix}/{f['name']}/{sf['name']}")
+            bucket.remove(paths)
+    except Exception:
+        pass  # DB row already deleted; storage cleanup is best-effort
