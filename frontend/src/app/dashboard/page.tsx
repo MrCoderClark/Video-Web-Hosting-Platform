@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { apiFetch } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 import { Film, Upload, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 interface Video {
@@ -83,6 +84,60 @@ export default function DashboardPage() {
         setError(err.message);
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  // SSE: real-time status updates
+  useEffect(() => {
+    let cancelled = false;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
+    async function connectSSE() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || cancelled) return;
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
+      const url = `${backendUrl}/api/videos/status/stream`;
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok || !response.body || cancelled) return;
+
+      reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!cancelled) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const chunk of lines) {
+          const dataLine = chunk.replace(/^data: /, "").trim();
+          if (!dataLine) continue;
+          try {
+            const update = JSON.parse(dataLine);
+            setVideos((prev) =>
+              prev.map((v) =>
+                v.id === update.id
+                  ? { ...v, status: update.status, thumbnail_url: update.thumbnail_url }
+                  : v
+              )
+            );
+          } catch {}
+        }
+      }
+    }
+
+    connectSSE();
+    return () => {
+      cancelled = true;
+      reader?.cancel();
+    };
   }, []);
 
   return (

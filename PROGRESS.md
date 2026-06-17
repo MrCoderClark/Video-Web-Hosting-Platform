@@ -26,12 +26,12 @@
 - [x] API client with auth token injection
 - [x] GET /api/videos + GET /api/videos/:id endpoints
 
-## Phase 3: FFmpeg Transcoding Pipeline
-- [ ] Background transcoding worker
-- [ ] HLS output (360p, 720p, 1080p)
-- [ ] Thumbnail generation
-- [ ] Transcoded files stored in Supabase Storage
-- [ ] Real-time status updates (queued → processing → ready → error)
+## Phase 3: FFmpeg Transcoding Pipeline ✅
+- [x] Background transcoding worker (polls queued, processes FIFO)
+- [x] HLS output (360p, 720p, 1080p adaptive with master.m3u8)
+- [x] Thumbnail generation (signed URL)
+- [x] Transcoded files stored in Supabase Storage
+- [x] Real-time status updates via SSE (dashboard live updates)
 
 ## Phase 4: Video Playback & Browse
 - [ ] Watch page with HLS.js adaptive player

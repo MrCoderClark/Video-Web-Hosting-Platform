@@ -1,6 +1,9 @@
+import asyncio
+import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from auth import get_current_user
 from database import get_pool
@@ -112,6 +115,56 @@ async def list_videos(current_user: dict = Depends(get_current_user)):
     ]
 
     return VideoListResponse(videos=videos, total=len(videos))
+
+
+@router.get("/status/stream")
+async def stream_video_status(request: Request, current_user: dict = Depends(get_current_user)):
+    """SSE endpoint — streams video status changes for the current user."""
+
+    async def event_generator():
+        pool = await get_pool()
+        last_states: dict[str, str] = {}
+
+        while True:
+            if await request.is_disconnected():
+                break
+
+            rows = await pool.fetch(
+                """
+                SELECT id, title, status, thumbnail_url
+                FROM videohost.videos
+                WHERE user_id = $1 AND status IN ('queued', 'processing', 'ready', 'error')
+                ORDER BY created_at DESC
+                LIMIT 50
+                """,
+                uuid.UUID(current_user["id"]),
+            )
+
+            for row in rows:
+                vid_id = str(row["id"])
+                current_status = row["status"]
+
+                if last_states.get(vid_id) != current_status:
+                    last_states[vid_id] = current_status
+                    data = json.dumps({
+                        "id": vid_id,
+                        "title": row["title"],
+                        "status": current_status,
+                        "thumbnail_url": row["thumbnail_url"],
+                    })
+                    yield f"data: {data}\n\n"
+
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/{video_id}", response_model=VideoResponse)
