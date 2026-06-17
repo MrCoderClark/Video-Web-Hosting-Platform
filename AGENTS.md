@@ -40,7 +40,7 @@ npx playwright test      # E2E tests
 ```bash
 cd backend
 uv sync                  # Install dependencies (creates .venv automatically)
-uv run uvicorn main:app --reload --port 8001   # Dev server
+uv run uvicorn main:app --reload --port 8007   # Dev server
 uv run pytest            # Run tests
 uv run ruff check .      # Lint
 uv run ruff format .     # Format

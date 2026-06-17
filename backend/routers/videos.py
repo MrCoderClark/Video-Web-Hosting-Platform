@@ -55,7 +55,7 @@ async def upload_video(
     pool = await get_pool()
     await pool.execute(
         """
-        INSERT INTO videos (id, user_id, title, description, status, original_filename, original_size_bytes, storage_path)
+        INSERT INTO videohost.videos (id, user_id, title, description, status, original_filename, original_size_bytes, storage_path)
         VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8)
         """,
         uuid.UUID(video_id),
@@ -84,7 +84,7 @@ async def list_videos(current_user: dict = Depends(get_current_user)):
         SELECT id, user_id, title, description, status, original_filename,
                original_size_bytes, storage_path, thumbnail_url, duration_seconds,
                width, height, created_at, updated_at
-        FROM videos
+        FROM videohost.videos
         WHERE user_id = $1
         ORDER BY created_at DESC
         """,
@@ -123,7 +123,7 @@ async def get_video(video_id: str, current_user: dict = Depends(get_current_user
         SELECT id, user_id, title, description, status, original_filename,
                original_size_bytes, storage_path, thumbnail_url, duration_seconds,
                width, height, created_at, updated_at
-        FROM videos
+        FROM videohost.videos
         WHERE id = $1 AND user_id = $2
         """,
         uuid.UUID(video_id),

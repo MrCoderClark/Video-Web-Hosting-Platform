@@ -15,7 +15,8 @@ def verify_token(token: str) -> dict:
         # In production, set SUPABASE_JWT_SECRET and verify signature
         payload = jwt.decode(
             token,
-            options={"verify_signature": False},
+            key="",
+            options={"verify_signature": False, "verify_aud": False},
             algorithms=["HS256"],
         )
         return payload

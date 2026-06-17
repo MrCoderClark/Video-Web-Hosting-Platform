@@ -1,5 +1,5 @@
--- Video status enum
-create type public.video_status as enum (
+-- Video status enum (in videohost schema)
+create type videohost.video_status as enum (
   'uploading',
   'queued',
   'processing',
@@ -8,12 +8,12 @@ create type public.video_status as enum (
 );
 
 -- Videos table
-create table if not exists public.videos (
+create table if not exists videohost.videos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Untitled',
   description text,
-  status public.video_status not null default 'uploading',
+  status videohost.video_status not null default 'uploading',
   original_filename text,
   original_size_bytes bigint,
   storage_path text,
@@ -26,32 +26,32 @@ create table if not exists public.videos (
 );
 
 -- Indexes
-create index idx_videos_user_id on public.videos(user_id);
-create index idx_videos_status on public.videos(status);
-create index idx_videos_created_at on public.videos(created_at desc);
+create index idx_videos_user_id on videohost.videos(user_id);
+create index idx_videos_status on videohost.videos(status);
+create index idx_videos_created_at on videohost.videos(created_at desc);
 
 -- Enable RLS
-alter table public.videos enable row level security;
+alter table videohost.videos enable row level security;
 
 -- RLS Policies
 create policy "Users can view own videos"
-  on public.videos for select
+  on videohost.videos for select
   using (auth.uid() = user_id);
 
 create policy "Users can insert own videos"
-  on public.videos for insert
+  on videohost.videos for insert
   with check (auth.uid() = user_id);
 
 create policy "Users can update own videos"
-  on public.videos for update
+  on videohost.videos for update
   using (auth.uid() = user_id);
 
 create policy "Users can delete own videos"
-  on public.videos for delete
+  on videohost.videos for delete
   using (auth.uid() = user_id);
 
 -- Auto-update updated_at on row change
-create or replace function public.update_updated_at()
+create or replace function videohost.update_updated_at()
 returns trigger as $$
 begin
   new.updated_at = now();
@@ -60,8 +60,11 @@ end;
 $$ language plpgsql;
 
 create trigger videos_updated_at
-  before update on public.videos
-  for each row execute function public.update_updated_at();
+  before update on videohost.videos
+  for each row execute function videohost.update_updated_at();
+
+-- Grant permissions on new tables (schema grant already done in 001)
+grant all on all tables in schema videohost to authenticated, anon;
 
 -- Create storage bucket for videos (run via Supabase SQL editor or API)
 -- Note: Storage bucket creation is typically done via the Supabase dashboard

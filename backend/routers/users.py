@@ -11,7 +11,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     """Return the current authenticated user's profile."""
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, display_name, avatar_url, created_at FROM profiles WHERE id = $1",
+        "SELECT id, display_name, avatar_url, created_at FROM videohost.profiles WHERE id = $1",
         current_user["id"],
     )
     if row:
