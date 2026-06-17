@@ -17,7 +17,11 @@ interface VideoPlayerProps {
   poster?: string;
   autoPlay?: boolean;
   rounded?: boolean;
+  videoId?: string;
 }
+
+const VIEW_THRESHOLD_SECONDS = 30;
+const VIEW_THRESHOLD_PERCENT = 0.3;
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -27,11 +31,14 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function VideoPlayer({ src, poster, autoPlay = false, rounded = false }: VideoPlayerProps) {
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
+
+export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, videoId }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const viewRecorded = useRef(false);
 
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -86,7 +93,17 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false }: 
 
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
-    const onTime = () => setCurrentTime(video.currentTime);
+    const onTime = () => {
+      setCurrentTime(video.currentTime);
+      // View tracking: 30s OR 30% of video (whichever first)
+      if (!viewRecorded.current && videoId && video.duration > 0) {
+        const threshold = Math.min(VIEW_THRESHOLD_SECONDS, video.duration * VIEW_THRESHOLD_PERCENT);
+        if (video.currentTime >= threshold) {
+          viewRecorded.current = true;
+          fetch(`${BACKEND_URL}/api/public/videos/${videoId}/view`, { method: "POST" }).catch(() => {});
+        }
+      }
+    };
     const onDuration = () => setDuration(video.duration);
     const onProgress = () => {
       if (video.buffered.length > 0) {

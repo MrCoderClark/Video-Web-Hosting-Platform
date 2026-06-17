@@ -90,6 +90,7 @@ export default function WatchPage() {
                 <VideoPlayer
                   src={hlsSrc}
                   poster={video.thumbnail_url || undefined}
+                  videoId={video.id}
                 />
               </div>
             </div>

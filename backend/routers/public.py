@@ -98,12 +98,6 @@ async def get_public_video(video_id: str):
     if not row:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    # Increment view count (fire-and-forget)
-    await pool.execute(
-        "UPDATE videohost.videos SET view_count = view_count + 1 WHERE id = $1",
-        uuid.UUID(video_id),
-    )
-
     return {
         "id": str(row["id"]),
         "title": row["title"],
@@ -116,6 +110,27 @@ async def get_public_video(video_id: str):
         "uploader_name": row["uploader_name"],
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
     }
+
+
+# ── View tracking ──────────────────────────────────────────────────
+
+@router.post("/videos/{video_id}/view", status_code=204)
+async def record_view(video_id: str):
+    """
+    Record a view for a video. Called by the player when the user has watched
+    at least 30 seconds OR 30% of the video (whichever comes first).
+    """
+    pool = await get_pool()
+    result = await pool.execute(
+        """
+        UPDATE videohost.videos
+        SET view_count = view_count + 1
+        WHERE id = $1 AND status = 'ready' AND visibility IN ('public', 'unlisted')
+        """,
+        uuid.UUID(video_id),
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(status_code=404, detail="Video not found")
 
 
 # ── HLS proxy ──────────────────────────────────────────────────────
