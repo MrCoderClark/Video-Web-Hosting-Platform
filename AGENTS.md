@@ -39,13 +39,11 @@ npx playwright test      # E2E tests
 ### Backend
 ```bash
 cd backend
-python -m venv venv      # Create virtual environment
-venv\Scripts\activate    # Activate (Windows)
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8001   # Dev server
-pytest                   # Run tests
-ruff check .             # Lint
-ruff format .            # Format
+uv sync                  # Install dependencies (creates .venv automatically)
+uv run uvicorn main:app --reload --port 8001   # Dev server
+uv run pytest            # Run tests
+uv run ruff check .      # Lint
+uv run ruff format .     # Format
 ```
 
 ### Video Processing
@@ -85,6 +83,25 @@ ffmpeg -version          # Verify FFmpeg is installed
 - Tests live in `frontend/tests/` (E2E) and `frontend/src/**/*.test.ts` (unit)
 - Backend tests live in `backend/tests/`
 - Each new feature must include at least one validation test
+
+## Branching Strategy
+
+Each phase gets its own feature branch off `main`. Merge via PR when the phase is validated.
+
+| Phase | Branch Name |
+|-------|-------------|
+| Phase 1 | `phase-1/scaffold-auth` |
+| Phase 2 | `phase-2/video-upload` |
+| Phase 3 | `phase-3/transcode-pipeline` |
+| Phase 4 | `phase-4/playback-browse` |
+| Phase 5 | `phase-5/dashboard-management` |
+| Phase 6 | `phase-6/polish-advanced` |
+
+**Workflow:**
+1. `git checkout -b phase-N/branch-name` from `main`
+2. Implement the phase (multiple commits allowed)
+3. Open PR → review → merge to `main`
+4. Delete the feature branch after merge
 
 ## Commit & Pull Request Guidelines
 
