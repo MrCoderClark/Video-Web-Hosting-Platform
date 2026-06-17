@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import close_pool, get_pool
-from routers import users
+from routers import users, videos
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(users.router, prefix="/api")
+app.include_router(videos.router, prefix="/api")
 
 
 @app.get("/api/health")

@@ -7,22 +7,24 @@
 - [x] .agent/plans/ structure created
 - [ ] Initial commit to GitHub
 
-## Phase 1: Scaffold & Auth
-- [ ] Next.js 15 app initialized (TypeScript, Tailwind, shadcn/ui)
-- [ ] FastAPI app initialized (venv, requirements.txt, config)
-- [ ] Supabase client connections (frontend + backend)
-- [ ] Auth flow: signup, login, logout
-- [ ] Protected routes
-- [ ] DB migration: profiles table + RLS
-- [ ] .env.example
+## Phase 1: Scaffold & Auth ✅
+- [x] Next.js 15 app initialized (TypeScript, Tailwind, shadcn/ui)
+- [x] FastAPI app initialized (uv, pyproject.toml, config)
+- [x] Supabase client connections (frontend + backend)
+- [x] Auth flow: signup, login, logout
+- [x] Protected routes (middleware)
+- [x] DB migration: profiles table + RLS + trigger
+- [x] .env.example + cinema-grade dark theme
 
 ## Phase 2: Video Upload & Storage
-- [ ] Upload page with drag-and-drop
-- [ ] Chunked upload for large files
-- [ ] Backend upload endpoint
-- [ ] Supabase Storage integration
-- [ ] Videos table + RLS
-- [ ] Upload progress indicator
+- [x] Upload page with drag-and-drop dropzone
+- [x] Upload progress bar (XHR with percentage + bytes)
+- [x] Backend upload endpoint (POST /api/videos/upload)
+- [x] Supabase Storage integration (service role)
+- [x] Videos table + RLS + status enum migration
+- [x] Dashboard with video list + status badges
+- [x] API client with auth token injection
+- [x] GET /api/videos + GET /api/videos/:id endpoints
 
 ## Phase 3: FFmpeg Transcoding Pipeline
 - [ ] Background transcoding worker
