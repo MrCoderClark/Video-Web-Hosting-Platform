@@ -12,6 +12,12 @@ class VideoStatus(str, Enum):
     error = "error"
 
 
+class VideoVisibility(str, Enum):
+    public = "public"
+    unlisted = "unlisted"
+    private = "private"
+
+
 class VideoCreate(BaseModel):
     title: str = "Untitled"
     description: str | None = None
@@ -23,6 +29,7 @@ class VideoResponse(BaseModel):
     title: str
     description: str | None
     status: VideoStatus
+    visibility: VideoVisibility
     original_filename: str | None
     original_size_bytes: int | None
     storage_path: str | None
@@ -30,6 +37,7 @@ class VideoResponse(BaseModel):
     duration_seconds: float | None
     width: int | None
     height: int | None
+    view_count: int
     created_at: datetime | None
     updated_at: datetime | None
 
