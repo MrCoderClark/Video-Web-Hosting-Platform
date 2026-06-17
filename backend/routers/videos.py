@@ -23,6 +23,7 @@ BUCKET_NAME = "videos"
 class VideoUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+    visibility: str | None = None
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -94,9 +95,9 @@ async def list_videos(current_user: dict = Depends(get_current_user)):
     pool = await get_pool()
     rows = await pool.fetch(
         """
-        SELECT id, user_id, title, description, status, original_filename,
+        SELECT id, user_id, title, description, status, visibility, original_filename,
                original_size_bytes, storage_path, thumbnail_url, duration_seconds,
-               width, height, created_at, updated_at
+               width, height, view_count, created_at, updated_at
         FROM videohost.videos
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -111,6 +112,7 @@ async def list_videos(current_user: dict = Depends(get_current_user)):
             title=row["title"],
             description=row["description"],
             status=row["status"],
+            visibility=row["visibility"],
             original_filename=row["original_filename"],
             original_size_bytes=row["original_size_bytes"],
             storage_path=row["storage_path"],
@@ -118,6 +120,7 @@ async def list_videos(current_user: dict = Depends(get_current_user)):
             duration_seconds=float(row["duration_seconds"]) if row["duration_seconds"] else None,
             width=row["width"],
             height=row["height"],
+            view_count=row["view_count"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -183,9 +186,9 @@ async def get_video(video_id: str, current_user: dict = Depends(get_current_user
     pool = await get_pool()
     row = await pool.fetchrow(
         """
-        SELECT id, user_id, title, description, status, original_filename,
+        SELECT id, user_id, title, description, status, visibility, original_filename,
                original_size_bytes, storage_path, thumbnail_url, duration_seconds,
-               width, height, created_at, updated_at
+               width, height, view_count, created_at, updated_at
         FROM videohost.videos
         WHERE id = $1 AND user_id = $2
         """,
@@ -202,6 +205,7 @@ async def get_video(video_id: str, current_user: dict = Depends(get_current_user
         title=row["title"],
         description=row["description"],
         status=row["status"],
+        visibility=row["visibility"],
         original_filename=row["original_filename"],
         original_size_bytes=row["original_size_bytes"],
         storage_path=row["storage_path"],
@@ -209,6 +213,7 @@ async def get_video(video_id: str, current_user: dict = Depends(get_current_user
         duration_seconds=float(row["duration_seconds"]) if row["duration_seconds"] else None,
         width=row["width"],
         height=row["height"],
+        view_count=row["view_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -220,7 +225,7 @@ async def update_video(
     body: VideoUpdate,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update video title and/or description."""
+    """Update video title, description, and/or visibility."""
     pool = await get_pool()
 
     sets = []
@@ -235,6 +240,10 @@ async def update_video(
         sets.append(f"description = ${idx}")
         values.append(body.description)
         idx += 1
+    if body.visibility is not None:
+        sets.append(f"visibility = ${idx}::videohost.video_visibility")
+        values.append(body.visibility)
+        idx += 1
 
     if not sets:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -244,9 +253,9 @@ async def update_video(
         UPDATE videohost.videos
         SET {', '.join(sets)}
         WHERE id = $1 AND user_id = $2
-        RETURNING id, user_id, title, description, status, original_filename,
+        RETURNING id, user_id, title, description, status, visibility, original_filename,
                   original_size_bytes, storage_path, thumbnail_url, duration_seconds,
-                  width, height, created_at, updated_at
+                  width, height, view_count, created_at, updated_at
         """,
         *values,
     )
@@ -260,6 +269,7 @@ async def update_video(
         title=row["title"],
         description=row["description"],
         status=row["status"],
+        visibility=row["visibility"],
         original_filename=row["original_filename"],
         original_size_bytes=row["original_size_bytes"],
         storage_path=row["storage_path"],
@@ -267,6 +277,7 @@ async def update_video(
         duration_seconds=float(row["duration_seconds"]) if row["duration_seconds"] else None,
         width=row["width"],
         height=row["height"],
+        view_count=row["view_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )

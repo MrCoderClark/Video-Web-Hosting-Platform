@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import {
   Film, Upload, Clock, CheckCircle2, AlertCircle, Loader2,
-  Pencil, Trash2, X, Check, ExternalLink,
+  Pencil, Trash2, X, Check, ExternalLink, Eye, EyeOff, Globe, Link2,
 } from "lucide-react";
 
 interface Video {
@@ -15,9 +15,11 @@ interface Video {
   title: string;
   description: string | null;
   status: string;
+  visibility: string;
   original_filename: string | null;
   original_size_bytes: number | null;
   thumbnail_url: string | null;
+  view_count: number;
   created_at: string | null;
 }
 
@@ -135,6 +137,21 @@ export default function DashboardPage() {
       setError(err.message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const cycleVisibility = async (video: Video) => {
+    const order = ["public", "unlisted", "private"];
+    const next = order[(order.indexOf(video.visibility) + 1) % order.length];
+    try {
+      await apiFetch(`/api/videos/${video.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: next }),
+      });
+      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, visibility: next } : v)));
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -296,8 +313,28 @@ export default function DashboardPage() {
                           {video.created_at && (
                             <span>{formatTimeAgo(video.created_at)}</span>
                           )}
+                          {video.status === "ready" && (
+                            <span className="flex items-center gap-1">
+                              <Eye className="h-3 w-3" strokeWidth={1.5} />
+                              {video.view_count}
+                            </span>
+                          )}
                         </div>
                       </div>
+
+                      {/* Visibility toggle */}
+                      {video.status === "ready" && (
+                        <button
+                          onClick={() => cycleVisibility(video)}
+                          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs shrink-0 border border-border-subtle hover:border-border-focus transition-colors"
+                          title={`Visibility: ${video.visibility} (click to change)`}
+                        >
+                          {video.visibility === "public" && <Globe className="h-3.5 w-3.5 text-success" strokeWidth={1.5} />}
+                          {video.visibility === "unlisted" && <Link2 className="h-3.5 w-3.5 text-warning" strokeWidth={1.5} />}
+                          {video.visibility === "private" && <EyeOff className="h-3.5 w-3.5 text-text-muted" strokeWidth={1.5} />}
+                          <span className="text-text-secondary capitalize">{video.visibility}</span>
+                        </button>
+                      )}
 
                       {/* Status badge */}
                       <div className={`flex items-center gap-1.5 text-xs shrink-0 ${statusCfg.color}`}>

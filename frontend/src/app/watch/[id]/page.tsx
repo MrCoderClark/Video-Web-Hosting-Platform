@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { VideoPlayer } from "@/components/video-player";
-import { Loader2, Calendar, Monitor, User as UserIcon } from "lucide-react";
+import { Loader2, Calendar, Monitor, User as UserIcon, Eye } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
 
@@ -16,6 +16,7 @@ interface VideoDetail {
   duration_seconds: number | null;
   width: number | null;
   height: number | null;
+  view_count: number;
   uploader_name: string | null;
   created_at: string | null;
 }
@@ -118,6 +119,12 @@ export default function WatchPage() {
                   <span className="flex items-center gap-1.5 text-text-muted">
                     <Monitor className="h-3.5 w-3.5" strokeWidth={1.5} />
                     {formatResolution(video.width, video.height)}
+                  </span>
+                )}
+                {video.view_count > 0 && (
+                  <span className="flex items-center gap-1.5 text-text-muted">
+                    <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {video.view_count.toLocaleString()} view{video.view_count !== 1 ? "s" : ""}
                   </span>
                 )}
               </div>

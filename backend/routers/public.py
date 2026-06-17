@@ -36,7 +36,7 @@ async def browse_videos(
                    p.display_name AS uploader_name
             FROM videohost.videos v
             LEFT JOIN videohost.profiles p ON p.id = v.user_id
-            WHERE v.status = 'ready'
+            WHERE v.status = 'ready' AND v.visibility = 'public'
               AND (v.title ILIKE '%' || $1 || '%' OR v.description ILIKE '%' || $1 || '%')
             ORDER BY v.created_at DESC
             LIMIT $2 OFFSET $3
@@ -51,7 +51,7 @@ async def browse_videos(
                    p.display_name AS uploader_name
             FROM videohost.videos v
             LEFT JOIN videohost.profiles p ON p.id = v.user_id
-            WHERE v.status = 'ready'
+            WHERE v.status = 'ready' AND v.visibility = 'public'
             ORDER BY v.created_at DESC
             LIMIT $1 OFFSET $2
             """,
@@ -81,22 +81,28 @@ async def browse_videos(
 
 @router.get("/videos/{video_id}")
 async def get_public_video(video_id: str):
-    """Get public metadata for a single ready video."""
+    """Get public metadata for a single ready video (public or unlisted)."""
     pool = await get_pool()
     row = await pool.fetchrow(
         """
         SELECT v.id, v.title, v.description, v.thumbnail_url,
-               v.duration_seconds, v.width, v.height, v.created_at,
+               v.duration_seconds, v.width, v.height, v.view_count, v.created_at,
                p.display_name AS uploader_name
         FROM videohost.videos v
         LEFT JOIN videohost.profiles p ON p.id = v.user_id
-        WHERE v.id = $1 AND v.status = 'ready'
+        WHERE v.id = $1 AND v.status = 'ready' AND v.visibility IN ('public', 'unlisted')
         """,
         uuid.UUID(video_id),
     )
 
     if not row:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    # Increment view count (fire-and-forget)
+    await pool.execute(
+        "UPDATE videohost.videos SET view_count = view_count + 1 WHERE id = $1",
+        uuid.UUID(video_id),
+    )
 
     return {
         "id": str(row["id"]),
@@ -106,6 +112,7 @@ async def get_public_video(video_id: str):
         "duration_seconds": float(row["duration_seconds"]) if row["duration_seconds"] else None,
         "width": row["width"],
         "height": row["height"],
+        "view_count": row["view_count"],
         "uploader_name": row["uploader_name"],
         "created_at": row["created_at"].isoformat() if row["created_at"] else None,
     }
@@ -125,7 +132,7 @@ async def proxy_hls(video_id: str, file_path: str):
     row = await pool.fetchrow(
         """
         SELECT user_id FROM videohost.videos
-        WHERE id = $1 AND status = 'ready'
+        WHERE id = $1 AND status = 'ready' AND visibility IN ('public', 'unlisted')
         """,
         uuid.UUID(video_id),
     )
