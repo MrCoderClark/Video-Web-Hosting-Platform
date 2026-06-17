@@ -8,6 +8,7 @@ node_modules/
 out/
 
 # Python
+.venv/
 venv/
 __pycache__/
 *.py[cod]
