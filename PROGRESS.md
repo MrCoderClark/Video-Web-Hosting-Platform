@@ -33,12 +33,14 @@
 - [x] Transcoded files stored in Supabase Storage
 - [x] Real-time status updates via SSE (dashboard live updates)
 
-## Phase 4: Video Playback & Browse
-- [ ] Watch page with HLS.js adaptive player
-- [ ] Video detail page (title, description, uploader)
-- [ ] Home/browse page with video card grid
-- [ ] Search (title/description)
-- [ ] Responsive design
+## Phase 4: Video Playback & Browse ✅
+- [x] Watch page with HLS.js adaptive player + quality selector
+- [x] Video detail page (title, description, uploader, resolution)
+- [x] Home/browse page with responsive video card grid
+- [x] Search (title/description via ILIKE)
+- [x] Responsive design (1-4 column grid)
+- [x] Backend: public endpoints (browse, detail, HLS proxy)
+- [x] Custom video controls (play/pause, mute, seek, fullscreen)
 
 ## Phase 5: User Dashboard & Management
 - [ ] User dashboard (my videos, status, views)

@@ -84,3 +84,8 @@
     @apply font-sans;
   }
 }
+
+/* Hide scrollbar for horizontal carousels */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

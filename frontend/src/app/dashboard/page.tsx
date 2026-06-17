@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { apiFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import { Film, Upload, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Film, Upload, Clock, CheckCircle2, AlertCircle, Loader2,
+  Pencil, Trash2, X, Check, ExternalLink,
+} from "lucide-react";
 
 interface Video {
   id: string;
@@ -74,6 +77,12 @@ export default function DashboardPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch<VideoListResponse>("/api/videos")
@@ -85,6 +94,49 @@ export default function DashboardPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const startEdit = (video: Video) => {
+    setEditingId(video.id);
+    setEditTitle(video.title);
+    setEditDescription(video.description || "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle("");
+    setEditDescription("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const updated = await apiFetch<Video>(`/api/videos/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, description: editDescription }),
+      });
+      setVideos((prev) => prev.map((v) => (v.id === editingId ? { ...v, title: updated.title, description: updated.description } : v)));
+      cancelEdit();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteVideo = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
+      setVideos((prev) => prev.filter((v) => v.id !== id));
+      setConfirmDeleteId(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // SSE: real-time status updates
   useEffect(() => {
@@ -196,45 +248,145 @@ export default function DashboardPage() {
           {!loading && videos.length > 0 && (
             <div className="mt-8 space-y-3">
               {videos.map((video) => {
-                const status = statusConfig[video.status] || statusConfig.queued;
+                const statusCfg = statusConfig[video.status] || statusConfig.queued;
+                const isEditing = editingId === video.id;
+                const isConfirmingDelete = confirmDeleteId === video.id;
+                const isDeleting = deletingId === video.id;
+
                 return (
                   <div
                     key={video.id}
-                    className="flex items-center gap-4 rounded-xl border border-border-subtle bg-bg-surface p-4 transition-colors hover:border-border-focus"
+                    className="rounded-xl border border-border-subtle bg-bg-surface p-4 transition-colors hover:border-border-focus"
                   >
-                    {/* Thumbnail placeholder */}
-                    <div className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-bg-elevated">
-                      {video.thumbnail_url ? (
-                        <img
-                          src={video.thumbnail_url}
-                          alt={video.title}
-                          className="h-full w-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <Film className="h-6 w-6 text-text-muted" strokeWidth={1.5} />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-text-primary">
-                        {video.title}
-                      </p>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
-                        {video.original_size_bytes && (
-                          <span>{formatFileSize(video.original_size_bytes)}</span>
+                    <div className="flex items-center gap-4">
+                      {/* Thumbnail */}
+                      <Link
+                        href={video.status === "ready" ? `/watch/${video.id}` : "#"}
+                        className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-bg-elevated overflow-hidden"
+                      >
+                        {video.thumbnail_url ? (
+                          <img
+                            src={video.thumbnail_url}
+                            alt={video.title}
+                            className="h-full w-full rounded-lg object-cover"
+                          />
+                        ) : (
+                          <Film className="h-6 w-6 text-text-muted" strokeWidth={1.5} />
                         )}
-                        {video.created_at && (
-                          <span>{formatTimeAgo(video.created_at)}</span>
+                      </Link>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                          <input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full rounded-md border border-border-subtle bg-bg-elevated px-2 py-1 text-sm text-text-primary focus:border-accent-indigo focus:outline-none"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="truncate text-sm font-medium text-text-primary">
+                            {video.title}
+                          </p>
+                        )}
+                        <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
+                          {video.original_size_bytes && (
+                            <span>{formatFileSize(video.original_size_bytes)}</span>
+                          )}
+                          {video.created_at && (
+                            <span>{formatTimeAgo(video.created_at)}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Status badge */}
+                      <div className={`flex items-center gap-1.5 text-xs shrink-0 ${statusCfg.color}`}>
+                        {statusCfg.icon}
+                        {statusCfg.label}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {video.status === "ready" && (
+                          <Link
+                            href={`/watch/${video.id}`}
+                            className="rounded-md p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                            title="Watch"
+                          >
+                            <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
+                          </Link>
+                        )}
+
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={saveEdit}
+                              disabled={saving}
+                              className="rounded-md p-1.5 text-success hover:bg-success/10 transition-colors disabled:opacity-50"
+                              title="Save"
+                            >
+                              {saving ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Check className="h-4 w-4" strokeWidth={1.5} />}
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="rounded-md p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="h-4 w-4" strokeWidth={1.5} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEdit(video)}
+                              className="rounded-md p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4" strokeWidth={1.5} />
+                            </button>
+
+                            {isConfirmingDelete ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => deleteVideo(video.id)}
+                                  disabled={isDeleting}
+                                  className="rounded-md px-2 py-1 text-xs bg-error text-white hover:bg-error/80 transition-colors disabled:opacity-50"
+                                >
+                                  {isDeleting ? "..." : "Delete"}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="rounded-md p-1.5 text-text-muted hover:text-text-primary transition-colors"
+                                >
+                                  <X className="h-4 w-4" strokeWidth={1.5} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteId(video.id)}
+                                className="rounded-md p-1.5 text-text-muted hover:text-error hover:bg-error/10 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
 
-                    {/* Status badge */}
-                    <div className={`flex items-center gap-1.5 text-xs ${status.color}`}>
-                      {status.icon}
-                      {status.label}
-                    </div>
+                    {/* Edit description (expanded row) */}
+                    {isEditing && (
+                      <div className="mt-3 pl-32">
+                        <textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          placeholder="Description (optional)"
+                          rows={2}
+                          className="w-full rounded-md border border-border-subtle bg-bg-elevated px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-indigo focus:outline-none resize-none"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
