@@ -12,12 +12,20 @@ import {
   Settings,
 } from "lucide-react";
 
+type AccentColor = "indigo" | "orange" | (string & {});
+
+const ACCENT_PRESETS: Record<string, { bg: string; shadow: string }> = {
+  indigo: { bg: "rgba(99,102,241,0.9)", shadow: "rgba(99,102,241,0.3)" },
+  orange: { bg: "rgba(232,77,47,0.9)", shadow: "rgba(232,77,47,0.3)" },
+};
+
 interface VideoPlayerProps {
   src: string;
   poster?: string;
   autoPlay?: boolean;
   rounded?: boolean;
   videoId?: string;
+  accentColor?: AccentColor;
 }
 
 const VIEW_THRESHOLD_SECONDS = 30;
@@ -33,7 +41,8 @@ function formatTime(seconds: number): string {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
 
-export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, videoId }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, videoId, accentColor = "indigo" }: VideoPlayerProps) {
+  const accent = ACCENT_PRESETS[accentColor] || { bg: accentColor, shadow: "rgba(0,0,0,0.2)" };
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -208,7 +217,10 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
           className="absolute inset-0 flex items-center justify-center bg-black/30"
           onClick={(e) => { e.stopPropagation(); togglePlay(); }}
         >
-          <button className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-indigo/90 text-white shadow-[0_0_40px_rgba(99,102,241,0.3)] transition-transform hover:scale-110">
+          <button
+            className="flex h-16 w-16 items-center justify-center rounded-full text-white transition-transform hover:scale-110"
+            style={{ backgroundColor: accent.bg, boxShadow: `0 0 40px ${accent.shadow}` }}
+          >
             <Play className="h-7 w-7 ml-1" strokeWidth={1.5} fill="currentColor" />
           </button>
         </div>

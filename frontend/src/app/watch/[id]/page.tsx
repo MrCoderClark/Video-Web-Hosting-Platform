@@ -65,7 +65,7 @@ export default function WatchPage() {
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
   const watchUrl = video ? `${siteUrl}/watch/${video.id}` : "";
   const embedCode = video
-    ? `<iframe src="${siteUrl}/embed/${video.id}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`
+    ? `<iframe src="${siteUrl}/embed/${video.id}?color=indigo" width="640" height="360" frameborder="0" allowfullscreen></iframe>`
     : "";
 
   const copyToClipboard = (text: string, label: string) => {
