@@ -158,49 +158,57 @@ export default function HomePage() {
         {/* Content loaded */}
         {!loading && (
           <>
-            {/* Featured Hero */}
-            {featured && !query && (
+            {/* Featured Hero — only show when we have 4+ videos */}
+            {featured && !query && videos.length >= 4 && (
               <section className="relative">
                 <div className="relative mx-auto max-w-[1400px] px-6 pt-6">
                   <Link
                     href={`/watch/${featured.id}`}
-                    className="group relative block aspect-[21/9] overflow-hidden rounded-2xl"
+                    className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-bg-elevated via-bg-surface to-bg-deep border border-border-subtle"
                   >
-                    {/* Background image */}
-                    {featured.thumbnail_url ? (
-                      <img
-                        src={featured.thumbnail_url}
-                        alt={featured.title}
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-bg-elevated to-bg-surface" />
-                    )}
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 sm:p-10">
+                      {/* Thumbnail (inset, not full-bleed) */}
+                      <div className="relative w-full sm:w-[360px] shrink-0 aspect-video overflow-hidden rounded-xl shadow-2xl">
+                        {featured.thumbnail_url ? (
+                          <img
+                            src={featured.thumbnail_url}
+                            alt={featured.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-bg-elevated flex items-center justify-center">
+                            <Film className="h-10 w-10 text-text-muted" strokeWidth={1.5} />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-all">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play className="h-5 w-5 text-bg-deep ml-0.5" strokeWidth={2} fill="currentColor" />
+                          </div>
+                        </div>
+                      </div>
 
-                    {/* Dark overlay gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
-
-                    {/* Content overlay */}
-                    <div className="absolute inset-0 flex flex-col justify-end p-6 sm:p-10">
-                      <h2 className="font-heading text-2xl sm:text-4xl font-bold text-white leading-tight max-w-lg">
-                        {featured.title}
-                      </h2>
-                      {featured.uploader_name && (
-                        <p className="mt-2 text-sm sm:text-base text-white/70">
-                          {featured.uploader_name}
-                        </p>
-                      )}
-                      {featured.description && (
-                        <p className="mt-2 text-sm text-white/60 line-clamp-2 max-w-md hidden sm:block">
-                          {featured.description}
-                        </p>
-                      )}
-                      <div className="mt-4">
-                        <span className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-black shadow-lg transition-transform group-hover:scale-105">
-                          <Play className="h-4 w-4" strokeWidth={2} fill="currentColor" />
-                          Watch
-                        </span>
+                      {/* Info */}
+                      <div className="flex-1 text-center sm:text-left">
+                        <p className="text-xs font-medium uppercase tracking-wider text-accent-indigo mb-2">Featured</p>
+                        <h2 className="font-heading text-2xl sm:text-3xl font-bold text-text-primary leading-tight">
+                          {featured.title}
+                        </h2>
+                        {featured.uploader_name && (
+                          <p className="mt-2 text-sm text-text-secondary">
+                            {featured.uploader_name}
+                          </p>
+                        )}
+                        {featured.description && (
+                          <p className="mt-3 text-sm text-text-muted line-clamp-2 max-w-md">
+                            {featured.description}
+                          </p>
+                        )}
+                        <div className="mt-5">
+                          <span className="inline-flex items-center gap-2 rounded-lg bg-accent-indigo px-5 py-2.5 text-sm font-medium text-white shadow-lg transition-transform group-hover:scale-105">
+                            <Play className="h-4 w-4" strokeWidth={2} fill="currentColor" />
+                            Watch now
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -269,10 +277,31 @@ export default function HomePage() {
               </section>
             )}
 
-            {/* Browse rows (non-search) */}
-            {!query && restVideos.length > 0 && (
+            {/* Browse content (non-search) */}
+            {!query && videos.length > 0 && (
               <section className="mx-auto max-w-[1400px] px-6 py-8 space-y-10">
-                <VideoRow title="Latest uploads" videos={restVideos} />
+                {videos.length >= 4 ? (
+                  <VideoRow title="Latest uploads" videos={restVideos} />
+                ) : (
+                  <>
+                    <h2 className="font-heading text-lg sm:text-xl font-semibold text-text-primary">
+                      Latest uploads
+                    </h2>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
+                      {videos.map((v) => (
+                        <VideoCard
+                          key={v.id}
+                          id={v.id}
+                          title={v.title}
+                          thumbnailUrl={v.thumbnail_url}
+                          durationSeconds={v.duration_seconds}
+                          uploaderName={v.uploader_name}
+                          createdAt={v.created_at}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </section>
             )}
 

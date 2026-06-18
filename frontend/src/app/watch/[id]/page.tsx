@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { VideoPlayer } from "@/components/video-player";
-import { Loader2, Calendar, Monitor, User as UserIcon, Eye } from "lucide-react";
+import { Loader2, Calendar, Monitor, User as UserIcon, Eye, Share2, Link2, Code2, Check } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
 
@@ -60,6 +60,19 @@ export default function WatchPage() {
   }, [params.id]);
 
   const hlsSrc = video ? `${BACKEND_URL}/api/public/videos/${video.id}/hls/master.m3u8` : "";
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const watchUrl = video ? `${siteUrl}/watch/${video.id}` : "";
+  const embedCode = video
+    ? `<iframe src="${siteUrl}/embed/${video.id}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`
+    : "";
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   return (
     <>
@@ -128,6 +141,33 @@ export default function WatchPage() {
                     {video.view_count.toLocaleString()} view{video.view_count !== 1 ? "s" : ""}
                   </span>
                 )}
+              </div>
+
+              {/* Share & Embed */}
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => copyToClipboard(watchUrl, "link")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-subtle px-3.5 py-2 text-sm text-text-secondary hover:border-border-focus hover:text-text-primary transition-colors"
+                >
+                  {copied === "link" ? <Check className="h-4 w-4 text-success" strokeWidth={1.5} /> : <Link2 className="h-4 w-4" strokeWidth={1.5} />}
+                  {copied === "link" ? "Copied!" : "Copy link"}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(embedCode, "embed")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-subtle px-3.5 py-2 text-sm text-text-secondary hover:border-border-focus hover:text-text-primary transition-colors"
+                >
+                  {copied === "embed" ? <Check className="h-4 w-4 text-success" strokeWidth={1.5} /> : <Code2 className="h-4 w-4" strokeWidth={1.5} />}
+                  {copied === "embed" ? "Copied!" : "Embed"}
+                </button>
+                <a
+                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(watchUrl)}&text=${encodeURIComponent(video.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-subtle px-3.5 py-2 text-sm text-text-secondary hover:border-border-focus hover:text-text-primary transition-colors"
+                >
+                  <Share2 className="h-4 w-4" strokeWidth={1.5} />
+                  Share
+                </a>
               </div>
 
               {video.description && (
