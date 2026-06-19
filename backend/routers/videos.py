@@ -283,6 +283,64 @@ async def update_video(
     )
 
 
+@router.post("/{video_id}/thumbnail")
+async def upload_thumbnail(
+    video_id: str,
+    file: UploadFile,
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a custom thumbnail image for a video."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    if file.size and file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Thumbnail must be under 5 MB")
+
+    pool = await get_pool()
+
+    # Verify ownership
+    row = await pool.fetchrow(
+        "SELECT id FROM videohost.videos WHERE id = $1 AND user_id = $2",
+        uuid.UUID(video_id),
+        uuid.UUID(current_user["id"]),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Upload to storage (overwrite existing thumbnail)
+    user_id = current_user["id"]
+    remote_path = f"{user_id}/{video_id}/thumbnail.jpg"
+    file_bytes = await file.read()
+
+    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+    bucket = client.storage.from_(BUCKET_NAME)
+
+    # Try remove old, then upload new (upsert)
+    try:
+        bucket.remove([remote_path])
+    except Exception:
+        pass
+
+    bucket.upload(
+        path=remote_path,
+        file=file_bytes,
+        file_options={"content-type": file.content_type or "image/jpeg"},
+    )
+
+    # Generate signed URL (1 year)
+    signed = bucket.create_signed_url(remote_path, 365 * 24 * 3600)
+    thumbnail_url = signed.get("signedURL", remote_path)
+
+    # Update DB
+    await pool.execute(
+        "UPDATE videohost.videos SET thumbnail_url = $1 WHERE id = $2",
+        thumbnail_url,
+        uuid.UUID(video_id),
+    )
+
+    return {"thumbnail_url": thumbnail_url}
+
+
 @router.delete("/{video_id}", status_code=204)
 async def delete_video(video_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a video: removes DB row and all storage files."""
