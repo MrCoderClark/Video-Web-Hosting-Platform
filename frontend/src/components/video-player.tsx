@@ -59,6 +59,9 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
   const [levels, setLevels] = useState<{ height: number; index: number }[]>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [showQuality, setShowQuality] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSpeed, setShowSpeed] = useState(false);
+  const [speedIndicator, setSpeedIndicator] = useState<string | null>(null);
 
   // ── HLS setup ──
   useEffect(() => {
@@ -148,6 +151,12 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
     if (!playing) setShowControls(true);
   }, [playing]);
 
+  // ── Brief indicator overlay ──
+  const flashIndicator = useCallback((text: string) => {
+    setSpeedIndicator(text);
+    setTimeout(() => setSpeedIndicator(null), 800);
+  }, []);
+
   // ── Actions ──
   const togglePlay = () => {
     const v = videoRef.current;
@@ -170,7 +179,7 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
     v.currentTime = pct * duration;
   };
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
     if (!document.fullscreenElement) {
@@ -180,6 +189,14 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
       await document.exitFullscreen();
       setIsFullscreen(false);
     }
+  }, []);
+
+  const changeSpeed = (rate: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.playbackRate = rate;
+    setPlaybackRate(rate);
+    setShowSpeed(false);
   };
 
   const setQuality = (index: number) => {
@@ -188,6 +205,82 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
     hls.currentLevel = index;
     setShowQuality(false);
   };
+
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      const container = containerRef.current;
+      if (!container) return;
+      // Only respond if the player or its children are focused, or if player is in viewport
+      if (!container.contains(document.activeElement) && document.activeElement !== document.body) return;
+
+      const v = videoRef.current;
+      if (!v) return;
+
+      switch (e.key) {
+        case " ":
+        case "k":
+          e.preventDefault();
+          v.paused ? v.play() : v.pause();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          v.currentTime = Math.max(0, v.currentTime - 5);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          v.currentTime = Math.min(v.duration, v.currentTime + 5);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          v.volume = Math.min(1, v.volume + 0.1);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          v.volume = Math.max(0, v.volume - 0.1);
+          break;
+        case "m":
+        case "M":
+          v.muted = !v.muted;
+          setMuted(v.muted);
+          break;
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
+        case ",":
+        case "<":
+          {
+            const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+            const idx = speeds.indexOf(v.playbackRate);
+            if (idx > 0) {
+              v.playbackRate = speeds[idx - 1];
+              setPlaybackRate(v.playbackRate);
+              flashIndicator(`${v.playbackRate}x`);
+            }
+          }
+          break;
+        case ".":
+        case ">":
+          {
+            const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+            const idx = speeds.indexOf(v.playbackRate);
+            if (idx < speeds.length - 1) {
+              v.playbackRate = speeds[idx + 1];
+              setPlaybackRate(v.playbackRate);
+              flashIndicator(`${v.playbackRate}x`);
+            }
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [toggleFullscreen, flashIndicator]);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
@@ -209,6 +302,15 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
         className="h-full w-full object-contain"
         playsInline
       />
+
+      {/* Speed indicator overlay */}
+      {speedIndicator && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="rounded-lg bg-black/70 px-4 py-2 text-white text-lg font-medium backdrop-blur-sm">
+            {speedIndicator}
+          </div>
+        </div>
+      )}
 
       {/* Big play button (center, when paused) */}
       {!playing && (
@@ -276,11 +378,38 @@ export function VideoPlayer({ src, poster, autoPlay = false, rounded = false, vi
 
           <div className="flex-1" />
 
+          {/* Speed selector */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowSpeed(!showSpeed); setShowQuality(false); }}
+              className={`text-xs font-medium px-1.5 py-0.5 rounded transition-colors ${
+                playbackRate !== 1 ? "text-accent-indigo" : "text-white hover:text-accent-indigo"
+              }`}
+            >
+              {playbackRate}x
+            </button>
+            {showSpeed && (
+              <div className="absolute bottom-8 right-0 w-28 rounded-lg border border-border-subtle bg-bg-surface p-1 shadow-xl">
+                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={() => changeSpeed(rate)}
+                    className={`w-full rounded-md px-3 py-1.5 text-left text-xs transition-colors ${
+                      playbackRate === rate ? "bg-accent-indigo/20 text-accent-indigo" : "text-text-secondary hover:bg-bg-elevated"
+                    }`}
+                  >
+                    {rate}x{rate === 1 ? " (Normal)" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Quality selector */}
           {levels.length > 1 && (
             <div className="relative">
               <button
-                onClick={() => setShowQuality(!showQuality)}
+                onClick={() => { setShowQuality(!showQuality); setShowSpeed(false); }}
                 className="text-white hover:text-accent-indigo transition-colors"
               >
                 <Settings className="h-5 w-5" strokeWidth={1.5} />
