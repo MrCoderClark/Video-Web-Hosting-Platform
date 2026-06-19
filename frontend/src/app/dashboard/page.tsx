@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { apiFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import {
   Film, Upload, Clock, CheckCircle2, AlertCircle, Loader2,
-  Pencil, Trash2, X, Check, ExternalLink, Eye, EyeOff, Globe, Link2,
+  Pencil, Trash2, X, Check, ExternalLink, Eye, EyeOff, Globe, Link2, ImagePlus,
 } from "lucide-react";
+import { toast } from "sonner";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8007";
 
 interface Video {
   id: string;
@@ -85,6 +88,9 @@ export default function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [uploadingThumbId, setUploadingThumbId] = useState<string | null>(null);
+  const thumbInputRef = useRef<HTMLInputElement>(null);
+  const thumbTargetId = useRef<string | null>(null);
 
   useEffect(() => {
     apiFetch<VideoListResponse>("/api/videos")
@@ -155,6 +161,44 @@ export default function DashboardPage() {
     }
   };
 
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const videoId = thumbTargetId.current;
+    if (!file || !videoId) return;
+    e.target.value = "";
+
+    setUploadingThumbId(videoId);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${BACKEND_URL}/api/videos/${videoId}/thumbnail`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+        throw new Error(body.detail);
+      }
+
+      const data = await res.json();
+      setVideos((prev) =>
+        prev.map((v) => (v.id === videoId ? { ...v, thumbnail_url: data.thumbnail_url } : v))
+      );
+      toast.success("Thumbnail updated");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload thumbnail");
+    } finally {
+      setUploadingThumbId(null);
+    }
+  };
+
   // SSE: real-time status updates
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +256,13 @@ export default function DashboardPage() {
   return (
     <>
       <Navbar />
+      <input
+        ref={thumbInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleThumbnailUpload}
+      />
       <div className="pt-16 px-6">
         <div className="mx-auto max-w-7xl py-12">
           <div className="flex items-center justify-between">
@@ -277,20 +328,39 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-4">
                       {/* Thumbnail */}
-                      <Link
-                        href={video.status === "ready" ? `/watch/${video.id}` : "#"}
-                        className="flex h-16 w-28 shrink-0 items-center justify-center rounded-lg bg-bg-elevated overflow-hidden"
-                      >
-                        {video.thumbnail_url ? (
-                          <img
-                            src={video.thumbnail_url}
-                            alt={video.title}
-                            className="h-full w-full rounded-lg object-cover"
-                          />
-                        ) : (
-                          <Film className="h-6 w-6 text-text-muted" strokeWidth={1.5} />
+                      <div className="relative group/thumb h-16 w-28 shrink-0">
+                        <Link
+                          href={video.status === "ready" ? `/watch/${video.id}` : "#"}
+                          className="flex h-full w-full items-center justify-center rounded-lg bg-bg-elevated overflow-hidden"
+                        >
+                          {video.thumbnail_url ? (
+                            <img
+                              src={video.thumbnail_url}
+                              alt={video.title}
+                              className="h-full w-full rounded-lg object-cover"
+                            />
+                          ) : (
+                            <Film className="h-6 w-6 text-text-muted" strokeWidth={1.5} />
+                          )}
+                        </Link>
+                        {video.status === "ready" && (
+                          <button
+                            onClick={() => {
+                              thumbTargetId.current = video.id;
+                              thumbInputRef.current?.click();
+                            }}
+                            disabled={uploadingThumbId === video.id}
+                            className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer"
+                            title="Change thumbnail"
+                          >
+                            {uploadingThumbId === video.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-white" strokeWidth={1.5} />
+                            ) : (
+                              <ImagePlus className="h-4 w-4 text-white" strokeWidth={1.5} />
+                            )}
+                          </button>
                         )}
-                      </Link>
+                      </div>
 
                       {/* Info */}
                       <div className="min-w-0 flex-1">
